@@ -6,15 +6,15 @@ This plan implements the Orientation Mali school orientation application using F
 
 ## Tasks
 
-- [ ] 1. Set up project structure and dependencies
-  - [ ] 1.1 Create project directory structure and configuration files
+- [x] 1. Set up project structure and dependencies
+  - [x] 1.1 Create project directory structure and configuration files
     - Create the following directory structure: `src/orientation_mali/` (main package), `src/orientation_mali/agents/`, `src/orientation_mali/models/`, `src/orientation_mali/validation/`, `src/orientation_mali/templates/`, `src/orientation_mali/static/`, `tests/unit/`, `tests/property/`, `tests/integration/`
     - Create `pyproject.toml` with dependencies: fastapi, uvicorn, jinja2, pydantic, strands-agents, strands-agents-bedrock, hypothesis, pytest
     - Create `src/orientation_mali/__init__.py` and sub-package `__init__.py` files
     - _Requirements: 7.1, 7.2_
 
-- [ ] 2. Implement data models
-  - [ ] 2.1 Create Pydantic data models for questionnaire, profile, and recommendations
+- [x] 2. Implement data models
+  - [x] 2.1 Create Pydantic data models for questionnaire, profile, and recommendations
     - Create `src/orientation_mali/models/schemas.py`
     - Implement `ExamType` enum with DEF and BAC values
     - Implement `Question` model with id, text, question_type, and optional options fields
@@ -26,24 +26,24 @@ This plan implements the Orientation Mali school orientation application using F
     - Implement `ErrorResponse` model with error, message, retry_available, and optional missing_questions
     - _Requirements: 3.3, 4.3, 4.4, 4.5, 4.6_
 
-  - [ ]* 2.2 Write property test for StudentProfile parsing completeness
+  - [x] 2.2 Write property test for StudentProfile parsing completeness
     - **Property 2: Parsed StudentProfile contains all required fields**
     - Use Hypothesis to generate valid profile JSON structures and verify all fields are non-empty
     - **Validates: Requirements 3.3**
 
-  - [ ]* 2.3 Write property test for RecommendationSet structural completeness
+  - [x] 2.3 Write property test for RecommendationSet structural completeness
     - **Property 3: RecommendationSet structural completeness**
     - Use Hypothesis to generate RecommendationSet instances and verify all lists have at least one element
     - **Validates: Requirements 4.3, 4.4, 4.5, 4.6**
 
-- [ ] 3. Implement questionnaire definition and validation module
-  - [ ] 3.1 Define the 10-question profiling questionnaire
+- [x] 3. Implement questionnaire definition and validation module
+  - [x] 3.1 Define the 10-question profiling questionnaire
     - Create `src/orientation_mali/models/questionnaire.py`
     - Define `QUESTIONNAIRE` list with 10 `Question` instances in French covering: academic interests, strengths, preferred subjects, career aspirations, learning style, and goals
     - Questions must assess interests, strengths, preferred subjects, and career aspirations
     - _Requirements: 1.1, 1.2, 1.3_
 
-  - [ ] 3.2 Implement validation module with French error messages
+  - [x] 3.2 Implement validation module with French error messages
     - Create `src/orientation_mali/validation/validator.py`
     - Implement `validate_submission(data: dict) -> tuple[QuestionnaireSubmission | None, list[str]]` function
     - Validate that all 10 questions are answered; return French error messages listing missing question IDs
@@ -52,21 +52,21 @@ This plan implements the Orientation Mali school orientation application using F
     - All error messages must be in French from a message catalog
     - _Requirements: 2.1, 2.2, 6.3_
 
-  - [ ]* 3.3 Write property test for incomplete submission validation
+  - [x] 3.3 Write property test for incomplete submission validation
     - **Property 1: Incomplete submission validation identifies all missing questions**
     - Use Hypothesis to generate subsets of 0-9 responses and verify error messages reference exactly the missing question IDs
     - **Validates: Requirements 2.2**
 
-  - [ ]* 3.4 Write property test for French validation messages
+  - [x] 3.4 Write property test for French validation messages
     - **Property 6: All validation error messages are in French**
     - Use Hypothesis to generate various invalid submissions and verify all returned messages are from the French message catalog
     - **Validates: Requirements 6.3**
 
-- [ ] 4. Checkpoint - Ensure all tests pass
+- [x] 4. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 5. Implement Profile Agent
-  - [ ] 5.1 Create the Profile Agent using Strands SDK and Amazon Nova Pro
+- [x] 5. Implement Profile Agent
+  - [x] 5.1 Create the Profile Agent using Strands SDK and Amazon Nova Pro
     - Create `src/orientation_mali/agents/profile_agent.py`
     - Configure `BedrockModel` with model_id="us.amazon.nova-pro-v1:0", region_name="us-east-1", temperature=0.3, max_tokens=2048
     - Write a French-language system prompt instructing the agent to analyze student responses and output a JSON-structured StudentProfile with strengths, interests, personality_traits, academic_inclinations, and summary
@@ -75,14 +75,14 @@ This plan implements the Orientation Mali school orientation application using F
     - Implement JSON parsing with error handling for malformed agent output
     - _Requirements: 3.1, 3.2, 3.3, 6.4, 7.1, 7.3_
 
-  - [ ]* 5.2 Write unit tests for Profile Agent parsing
+  - [x] 5.2 Write unit tests for Profile Agent parsing
     - Test parsing valid profile JSON into StudentProfile
     - Test handling of malformed JSON responses
     - Test handling of missing fields in agent output
     - _Requirements: 3.3_
 
-- [ ] 6. Implement Recommendation Agent
-  - [ ] 6.1 Create the Recommendation Agent using Strands SDK and Amazon Nova Pro
+- [x] 6. Implement Recommendation Agent
+  - [x] 6.1 Create the Recommendation Agent using Strands SDK and Amazon Nova Pro
     - Create `src/orientation_mali/agents/recommendation_agent.py`
     - Configure `BedrockModel` with model_id="us.amazon.nova-pro-v1:0", region_name="us-east-1", temperature=0.5, max_tokens=4096
     - Write a French-language system prompt with Malian education context: DEF/BAC paths, available BAC series (Sciences Exactes, Sciences Biologiques, Lettres, Sciences Humaines, Sciences Économiques), Malian institutions, and career paths
@@ -91,14 +91,14 @@ This plan implements the Orientation Mali school orientation application using F
     - Implement JSON parsing with error handling for malformed agent output
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 6.5, 7.2, 7.4, 8.1, 8.2, 8.3, 8.4_
 
-  - [ ]* 6.2 Write unit tests for Recommendation Agent parsing
+  - [x] 6.2 Write unit tests for Recommendation Agent parsing
     - Test parsing valid recommendation JSON into RecommendationSet
     - Test handling of malformed JSON responses
     - Test handling of empty lists in agent output
     - _Requirements: 4.3, 4.4, 4.5, 4.6_
 
-- [ ] 7. Implement orchestration layer and error handling
-  - [ ] 7.1 Create the orchestration service that chains Profile Agent and Recommendation Agent
+- [x] 7. Implement orchestration layer and error handling
+  - [x] 7.1 Create the orchestration service that chains Profile Agent and Recommendation Agent
     - Create `src/orientation_mali/agents/orchestrator.py`
     - Implement `process_orientation(exam_type: str, responses: dict) -> OrientationResult` function
     - Chain Profile Agent output to Recommendation Agent input
@@ -107,14 +107,14 @@ This plan implements the Orientation Mali school orientation application using F
     - Return appropriate French error messages for each failure scenario
     - _Requirements: 2.3, 3.4, 4.7, 7.5_
 
-  - [ ]* 7.2 Write unit tests for orchestration error handling
+  - [x] 7.2 Write unit tests for orchestration error handling
     - Test retry logic on agent failure (mock agent calls)
     - Test error message generation for each failure scenario
     - Test successful pipeline execution with mocked agents
     - _Requirements: 3.4, 4.7_
 
-- [ ] 8. Implement web layer with FastAPI and Jinja2 templates
-  - [ ] 8.1 Create FastAPI application with routes
+- [x] 8. Implement web layer with FastAPI and Jinja2 templates
+  - [x] 8.1 Create FastAPI application with routes
     - Create `src/orientation_mali/app.py`
     - Configure FastAPI app with Jinja2 templates directory and static files
     - Implement `GET /` route: render questionnaire.html with QUESTIONNAIRE data
@@ -123,7 +123,7 @@ This plan implements the Orientation Mali school orientation application using F
     - Store results in session or pass via query mechanism
     - _Requirements: 1.1, 1.4, 2.1, 2.3, 5.1_
 
-  - [ ] 8.2 Create Jinja2 templates for questionnaire, results, and error pages
+  - [x] 8.2 Create Jinja2 templates for questionnaire, results, and error pages
     - Create `src/orientation_mali/templates/questionnaire.html`: form with 10 questions, exam type selector (DEF/BAC), submit button, all text in French
     - Create `src/orientation_mali/templates/results.html`: display StudentProfile summary, then RecommendationSet organized into sections (Filières recommandées, Programmes de formation, Établissements, Métiers), render school website links as `<a>` tags when available
     - Create `src/orientation_mali/templates/error.html`: French error message display with retry button
@@ -131,35 +131,35 @@ This plan implements the Orientation Mali school orientation application using F
     - All UI text must be in French
     - _Requirements: 1.1, 1.2, 1.4, 5.1, 5.2, 5.3, 5.4, 6.1_
 
-  - [ ]* 8.3 Write property test for rendered recommendations sections
+  - [x] 8.3 Write property test for rendered recommendations sections
     - **Property 4: Rendered recommendations contain all category sections**
     - Use Hypothesis to generate valid RecommendationSets, render the template, and verify all four sections are present in the HTML
     - **Validates: Requirements 5.2**
 
-  - [ ]* 8.4 Write property test for school website link rendering
+  - [x] 8.4 Write property test for school website link rendering
     - **Property 5: School website links rendered when available**
     - Use Hypothesis to generate Schools with and without website fields, render, and verify `<a>` tag presence/absence
     - **Validates: Requirements 5.3**
 
-- [ ] 9. Checkpoint - Ensure all tests pass
+- [x] 9. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 10. Wire everything together and create application entry point
-  - [ ] 10.1 Create the application entry point and wire all components
+- [x] 10. Wire everything together and create application entry point
+  - [x] 10.1 Create the application entry point and wire all components
     - Create `src/orientation_mali/main.py` as the uvicorn entry point
     - Wire the FastAPI app with the orchestrator, validation module, and questionnaire data
     - Ensure the full flow works: questionnaire display → submission → validation → profile agent → recommendation agent → results display
     - Add proper error handling at the route level to catch and display French error messages
     - _Requirements: 1.1, 2.3, 5.1_
 
-  - [ ]* 10.2 Write integration tests for the full pipeline
+  - [x] 10.2 Write integration tests for the full pipeline
     - Test POST /api/submit with valid submission returns results page
     - Test POST /api/submit with incomplete submission returns validation errors in French
     - Test that results page displays all recommendation sections
     - Test error page displays with retry button on agent failure (mocked)
     - _Requirements: 2.1, 2.2, 5.1, 5.2_
 
-- [ ] 11. Final checkpoint - Ensure all tests pass
+- [x] 11. Final checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 ## Notes

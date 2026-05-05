@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Erreur - Orientation Mali{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .error-container {
+        text-align: center;
+        padding: 2rem 1rem;
+    }
+
+    .error-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+    }
+
+    .error-message {
+        font-size: 1.1rem;
+        color: #991b1b;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background-color: #fef2f2;
+        border-radius: 8px;
+        border: 1px solid #fecaca;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card error-container">
+    <div class="error-icon" aria-hidden="true">⚠️</div>
+    <h2 style="margin-bottom: 1rem; color: #991b1b;">Une erreur est survenue</h2>
+
+    <div class="error-message" role="alert">
+        {{ message }}
+    </div>
+
+    <div class="error-actions">
+        {% if retry_available %}
+        <a href="/" class="btn btn-primary">Réessayer</a>
+        {% endif %}
+        <a href="/" class="btn btn-secondary">Retour à l'accueil</a>
+    </div>
+</div>
+{% endblock %}

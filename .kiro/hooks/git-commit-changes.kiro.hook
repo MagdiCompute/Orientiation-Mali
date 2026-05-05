@@ -1,0 +1,13 @@
+{
+  "enabled": true,
+  "name": "Commit All Changes",
+  "description": "Stages all file updates and commits them to the current git branch when manually triggered.",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "git add -A && git commit -m \"Update project files\""
+  }
+}

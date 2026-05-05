@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block title %}Résultats - Orientation Mali{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .profile-section {
+        margin-bottom: 2rem;
+    }
+
+    .profile-summary {
+        font-size: 1.05rem;
+        color: #374151;
+        margin-bottom: 1.25rem;
+        padding: 1rem;
+        background-color: #f0fdf4;
+        border-radius: 6px;
+        border-left: 4px solid #14532d;
+    }
+
+    .profile-details {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+    }
+
+    .profile-detail-card {
+        padding: 1rem;
+        background-color: #f9fafb;
+        border-radius: 6px;
+    }
+
+    .profile-detail-card h4 {
+        color: #14532d;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 0.025em;
+    }
+
+    .profile-detail-card ul {
+        list-style: none;
+        padding: 0;
+    }
+
+    .profile-detail-card li {
+        padding: 0.25rem 0;
+        font-size: 0.9rem;
+        color: #4b5563;
+    }
+
+    .profile-detail-card li::before {
+        content: "• ";
+        color: #14532d;
+        font-weight: bold;
+    }
+
+    .section-title {
+        font-size: 1.3rem;
+        color: #14532d;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #d1fae5;
+    }
+
+    .recommendation-card {
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+        background-color: #f9fafb;
+        border-radius: 8px;
+        border: 1px solid #e5e7eb;
+    }
+
+    .recommendation-card h4 {
+        color: #1f2937;
+        margin-bottom: 0.5rem;
+    }
+
+    .recommendation-card p {
+        color: #4b5563;
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .recommendation-card .relevance {
+        color: #14532d;
+        font-style: italic;
+        font-size: 0.85rem;
+        margin-top: 0.5rem;
+    }
+
+    .recommendation-card .meta {
+        font-size: 0.85rem;
+        color: #6b7280;
+    }
+
+    .school-link {
+        color: #14532d;
+        text-decoration: underline;
+        font-weight: 500;
+    }
+
+    .school-link:hover {
+        color: #166534;
+    }
+
+    .school-programs {
+        margin-top: 0.5rem;
+    }
+
+    .school-programs span {
+        display: inline-block;
+        background-color: #d1fae5;
+        color: #14532d;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        margin: 0.15rem 0.25rem 0.15rem 0;
+    }
+
+    .exam-badge {
+        display: inline-block;
+        background-color: #14532d;
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .back-link {
+        display: inline-block;
+        margin-top: 2rem;
+        color: #14532d;
+        text-decoration: none;
+        font-weight: 500;
+    }
+
+    .back-link:hover {
+        text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+        .profile-details {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Profil de l'étudiant -->
+<div class="card profile-section">
+    <h2 class="section-title">📋 Votre profil</h2>
+    <span class="exam-badge">Examen : {{ result.exam_type.value }}</span>
+
+    <div class="profile-summary">
+        {{ result.profile.summary }}
+    </div>
+
+    <div class="profile-details">
+        <div class="profile-detail-card">
+            <h4>Points forts</h4>
+            <ul>
+                {% for strength in result.profile.strengths %}
+                <li>{{ strength }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="profile-detail-card">
+            <h4>Centres d'intérêt</h4>
+            <ul>
+                {% for interest in result.profile.interests %}
+                <li>{{ interest }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="profile-detail-card">
+            <h4>Traits de personnalité</h4>
+            <ul>
+                {% for trait in result.profile.personality_traits %}
+                <li>{{ trait }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="profile-detail-card">
+            <h4>Inclinations académiques</h4>
+            <ul>
+                {% for inclination in result.profile.academic_inclinations %}
+                <li>{{ inclination }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Filières recommandées -->
+<div class="card">
+    <h2 class="section-title">🎯 Filières recommandées</h2>
+    {% for major in result.recommendations.majors %}
+    <div class="recommendation-card">
+        <h4>{{ major.name }}</h4>
+        <p>{{ major.description }}</p>
+        <p class="relevance">💡 {{ major.relevance }}</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Programmes de formation -->
+<div class="card">
+    <h2 class="section-title">📚 Programmes de formation</h2>
+    {% for program in result.recommendations.training_programs %}
+    <div class="recommendation-card">
+        <h4>{{ program.name }}</h4>
+        <p>{{ program.institution }}</p>
+        <p class="meta">Durée : {{ program.duration }}</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Établissements -->
+<div class="card">
+    <h2 class="section-title">🏫 Établissements</h2>
+    {% for school in result.recommendations.schools %}
+    <div class="recommendation-card">
+        <h4>{{ school.name }}</h4>
+        <p>📍 {{ school.location }}</p>
+        {% if school.website %}
+        <p><a href="{{ school.website }}" class="school-link" target="_blank" rel="noopener noreferrer">Visiter le site web</a></p>
+        {% endif %}
+        <div class="school-programs">
+            {% for program in school.programs %}
+            <span>{{ program }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Métiers -->
+<div class="card">
+    <h2 class="section-title">💼 Métiers</h2>
+    {% for career in result.recommendations.career_paths %}
+    <div class="recommendation-card">
+        <h4>{{ career.title }}</h4>
+        <p>{{ career.description }}</p>
+        <p class="meta">Secteur : {{ career.sector }}</p>
+    </div>
+    {% endfor %}
+</div>
+
+<a href="/" class="back-link">← Remplir un nouveau questionnaire</a>
+{% endblock %}

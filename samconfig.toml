@@ -1,0 +1,16 @@
+# SAM CLI configuration for Orientation Mali
+# Run: sam build && sam deploy
+
+version = 0.1
+
+[default.build.parameters]
+use_container = false
+manifest = "requirements.txt"
+
+[default.deploy.parameters]
+stack_name = "orientation-mali"
+resolve_s3 = true
+s3_prefix = "orientation-mali"
+region = "us-east-1"
+capabilities = "CAPABILITY_IAM"
+confirm_changeset = true

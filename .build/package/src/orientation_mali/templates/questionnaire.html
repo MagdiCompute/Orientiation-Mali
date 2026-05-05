@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}Questionnaire - Orientation Mali{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .question-group {
+        margin-bottom: 1.75rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #e5e7eb;
+    }
+
+    .question-group:last-of-type {
+        border-bottom: none;
+        margin-bottom: 0;
+        padding-bottom: 0;
+    }
+
+    .question-label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 0.5rem;
+        color: #1f2937;
+    }
+
+    .question-number {
+        color: #14532d;
+        font-weight: 700;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 0.625rem 0.75rem;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 0.95rem;
+        font-family: inherit;
+        transition: border-color 0.2s;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #14532d;
+        box-shadow: 0 0 0 3px rgba(20, 83, 45, 0.1);
+    }
+
+    textarea.form-input {
+        min-height: 80px;
+        resize: vertical;
+    }
+
+    .radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-top: 0.25rem;
+    }
+
+    .radio-option {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid #e5e7eb;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .radio-option:hover {
+        background-color: #f0fdf4;
+    }
+
+    .radio-option input[type="radio"] {
+        accent-color: #14532d;
+    }
+
+    .exam-type-section {
+        margin-bottom: 2rem;
+    }
+
+    .exam-type-options {
+        display: flex;
+        gap: 1rem;
+        margin-top: 0.5rem;
+    }
+
+    .exam-type-option {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        padding: 1rem;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+    }
+
+    .exam-type-option:hover {
+        border-color: #14532d;
+        background-color: #f0fdf4;
+    }
+
+    .exam-type-option input[type="radio"] {
+        accent-color: #14532d;
+    }
+
+    .exam-type-option input[type="radio"]:checked + span {
+        color: #14532d;
+    }
+
+    .submit-section {
+        text-align: center;
+        margin-top: 2rem;
+    }
+
+    .submit-section .btn {
+        padding: 1rem 3rem;
+        font-size: 1.1rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2 style="margin-bottom: 0.5rem; color: #14532d;">Questionnaire de profilage</h2>
+    <p style="margin-bottom: 1.5rem; color: #6b7280;">
+        Répondez aux 10 questions suivantes pour recevoir des recommandations personnalisées
+        d'orientation scolaire et professionnelle.
+    </p>
+
+    {% if errors %}
+    <div class="error-list" role="alert" aria-live="polite">
+        <strong>⚠️ Veuillez corriger les erreurs suivantes :</strong>
+        <ul>
+            {% for error in errors %}
+            <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+
+    <form method="post" action="/api/submit">
+        <!-- Sélection du type d'examen -->
+        <div class="exam-type-section">
+            <label class="question-label">Quel examen préparez-vous ?</label>
+            <div class="exam-type-options">
+                <label class="exam-type-option">
+                    <input type="radio" name="exam_type" value="DEF"
+                        {% if form_data and form_data.exam_type == "DEF" %}checked{% endif %}
+                        required>
+                    <span>DEF (Diplôme d'Études Fondamentales)</span>
+                </label>
+                <label class="exam-type-option">
+                    <input type="radio" name="exam_type" value="BAC"
+                        {% if form_data and form_data.exam_type == "BAC" %}checked{% endif %}>
+                    <span>BAC (Baccalauréat)</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Questions du questionnaire -->
+        {% for question in questions %}
+        <div class="question-group">
+            <label class="question-label" for="{{ question.id }}">
+                <span class="question-number">{{ loop.index }}.</span> {{ question.text }}
+            </label>
+
+            {% if question.question_type == "open" %}
+            <textarea
+                class="form-input"
+                id="{{ question.id }}"
+                name="{{ question.id }}"
+                placeholder="Votre réponse..."
+                aria-label="{{ question.text }}"
+            >{% if form_data and form_data.responses %}{{ form_data.responses.get(question.id, "") }}{% endif %}</textarea>
+
+            {% elif question.question_type == "multiple_choice" %}
+            <div class="radio-group" role="radiogroup" aria-label="{{ question.text }}">
+                {% for option in question.options %}
+                <label class="radio-option">
+                    <input type="radio" name="{{ question.id }}" value="{{ option }}"
+                        {% if form_data and form_data.responses and form_data.responses.get(question.id) == option %}checked{% endif %}>
+                    {{ option }}
+                </label>
+                {% endfor %}
+            </div>
+
+            {% elif question.question_type == "scale" %}
+            <div class="radio-group" role="radiogroup" aria-label="{{ question.text }}" style="flex-direction: row; flex-wrap: wrap;">
+                {% for option in question.options %}
+                <label class="radio-option" style="flex: 0 0 auto; padding: 0.5rem 1rem;">
+                    <input type="radio" name="{{ question.id }}" value="{{ option }}"
+                        {% if form_data and form_data.responses and form_data.responses.get(question.id) == option %}checked{% endif %}>
+                    {{ option }}
+                </label>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="submit-section">
+            <button type="submit" class="btn btn-primary">
+                Soumettre mes réponses
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

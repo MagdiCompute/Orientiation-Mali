@@ -1,0 +1,30 @@
+[project]
+name = "orientation-mali"
+version = "0.1.0"
+description = "Application d'orientation scolaire pour les étudiants maliens"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.32.0",
+    "jinja2>=3.1.4",
+    "pydantic>=2.9.0",
+    "strands-agents>=0.0.1",
+    "strands-agents-bedrock>=0.0.1",
+    "python-multipart>=0.0.12",
+    "mangum>=0.19.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "hypothesis>=6.112.0",
+    "pytest>=8.3.0",
+    "pytest-asyncio>=0.24.0",
+    "httpx>=0.27.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

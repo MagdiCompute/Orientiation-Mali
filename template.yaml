@@ -1,0 +1,77 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Orientation Mali - Application d'orientation scolaire pour les étudiants maliens.
+  Deployed as a Lambda function behind API Gateway.
+
+Globals:
+  Function:
+    Timeout: 60
+    MemorySize: 512
+    Runtime: python3.12
+
+Resources:
+  ResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-results"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  OrientationMaliFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.12
+    Properties:
+      Handler: handler.handler
+      CodeUri: .
+      Description: Orientation Mali FastAPI application
+      Architectures:
+        - x86_64
+      MemorySize: 512
+      Timeout: 60
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - bedrock:InvokeModel
+                - bedrock:InvokeModelWithResponseStream
+              Resource:
+                - "arn:aws:bedrock:*::foundation-model/amazon.nova-pro-v1:0"
+                - "arn:aws:bedrock:*::foundation-model/us.amazon.nova-pro-v1:0"
+                - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.amazon.nova-pro-v1:0"
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ResultsTable
+      Environment:
+        Variables:
+          RESULTS_TABLE_NAME: !Ref ResultsTable
+      Events:
+        ApiRoot:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+        ApiRootPath:
+          Type: HttpApi
+          Properties:
+            Path: /
+            Method: ANY
+
+Outputs:
+  OrientationMaliApi:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+  OrientationMaliFunction:
+    Description: Lambda Function ARN
+    Value: !GetAtt OrientationMaliFunction.Arn
+  ResultsTable:
+    Description: DynamoDB table for storing orientation results
+    Value: !Ref ResultsTable

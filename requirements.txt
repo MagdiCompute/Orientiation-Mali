@@ -1,0 +1,11 @@
+# Lambda deployment dependencies
+# Used by SAM build to package the function
+fastapi>=0.115.0
+uvicorn>=0.32.0
+jinja2>=3.1.4
+pydantic>=2.9.0
+strands-agents>=0.0.1
+strands-agents-bedrock>=0.0.1
+python-multipart>=0.0.12
+mangum>=0.19.0
+boto3>=1.35.0

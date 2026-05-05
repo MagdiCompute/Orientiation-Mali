@@ -1,0 +1,138 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Orientation Mali - Application d'orientation scolaire pour les étudiants maliens.
+  Deployed as a Lambda function behind API Gateway HTTP API.
+
+Parameters:
+  S3Bucket:
+    Type: String
+    Description: S3 bucket containing the Lambda deployment package
+  S3Key:
+    Type: String
+    Description: S3 key for the Lambda deployment package zip
+
+Resources:
+  # DynamoDB table for storing orientation results
+  ResultsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AWS::StackName}-results"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # Lambda execution role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-lambda-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: BedrockAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource:
+                  - "arn:aws:bedrock:*::foundation-model/amazon.nova-pro-v1:0"
+                  - "arn:aws:bedrock:*::foundation-model/us.amazon.nova-pro-v1:0"
+                  - !Sub "arn:aws:bedrock:*:${AWS::AccountId}:inference-profile/us.amazon.nova-pro-v1:0"
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:DeleteItem
+                Resource: !GetAtt ResultsTable.Arn
+
+  # Lambda function
+  OrientationMaliFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${AWS::StackName}-app"
+      Runtime: python3.12
+      Handler: handler.handler
+      Code:
+        S3Bucket: !Ref S3Bucket
+        S3Key: !Ref S3Key
+      MemorySize: 512
+      Timeout: 60
+      Architectures:
+        - x86_64
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Environment:
+        Variables:
+          RESULTS_TABLE_NAME: !Ref ResultsTable
+
+  # API Gateway HTTP API
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "${AWS::StackName}-api"
+      ProtocolType: HTTP
+
+  # API Gateway integration with Lambda
+  HttpApiIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt OrientationMaliFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  # Default route (catch-all)
+  HttpApiDefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: $default
+      Target: !Sub "integrations/${HttpApiIntegration}"
+
+  # API Gateway stage (auto-deploy)
+  HttpApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+
+  # Permission for API Gateway to invoke Lambda
+  LambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref OrientationMaliFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*"
+
+Outputs:
+  OrientationMaliApi:
+    Description: API Gateway endpoint URL
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+  OrientationMaliFunction:
+    Description: Lambda Function ARN
+    Value: !GetAtt OrientationMaliFunction.Arn
+  ResultsTable:
+    Description: DynamoDB table for storing orientation results
+    Value: !Ref ResultsTable
