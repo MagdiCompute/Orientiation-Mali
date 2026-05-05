@@ -1,0 +1,13 @@
+{
+  "version": "1.0.0",
+  "enabled": true,
+  "name": "GIT-HOOK",
+  "description": "Adding and commiting all file updates to the existing git repository branch.",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "askAgent",
+    "prompt": "In the project, add and commit all file updates to the existing git repository branch."
+  }
+}
