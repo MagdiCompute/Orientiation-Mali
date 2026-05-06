@@ -1,5 +1,5 @@
-../../bin/opentelemetry-bootstrap.exe,sha256=XCgJn5tLzPbcmUo_oYXZCmvcNHbrk7CXpVhUghdVw08,108417
-../../bin/opentelemetry-instrument.exe,sha256=J87JjBSBSuF2WxqX4McToiB5w-cxkzBJ9IUXipBBlQc,108428
+../../bin/opentelemetry-bootstrap.exe,sha256=mUG-6-T5s-L4xZuopSXr1MrZmwH1ODfTY8i2vC7gajI,108417
+../../bin/opentelemetry-instrument.exe,sha256=-jdNRiC1YVa3yuPPoUy7f5874wsk99UhWZtJOefb6SI,108428
 opentelemetry/instrumentation/__pycache__/_semconv.cpython-312.pyc,,
 opentelemetry/instrumentation/__pycache__/bootstrap.cpython-312.pyc,,
 opentelemetry/instrumentation/__pycache__/bootstrap_gen.cpython-312.pyc,,

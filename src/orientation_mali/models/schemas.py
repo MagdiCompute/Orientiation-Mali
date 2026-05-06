@@ -35,8 +35,8 @@ class QuestionnaireSubmission(BaseModel):
     responses: dict[str, str] = Field(
         ...,
         description="Correspondance entre l'identifiant de la question et la réponse",
-        min_length=10,
-        max_length=10,
+        min_length=9,
+        max_length=9,
     )
 
 
