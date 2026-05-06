@@ -78,16 +78,15 @@ def _make_recommendation_set() -> RecommendationSet:
 
 
 SAMPLE_RESPONSES = {
-    "q1": "Les mathématiques",
-    "q2": "Résoudre des problèmes logiques",
-    "q3": "Informatique et technologie",
-    "q4": "Ingénieur",
-    "q5": "Travailler seul avec concentration",
-    "q6": "Sciences exactes",
-    "q7": "Créer des applications",
-    "q8": "Très motivé",
-    "q9": "Analytique",
-    "q10": "Contribuer à l'innovation technologique",
+    "q1": "📐 Maths et Sciences",
+    "q2": "🔬 Sciences et mathématiques",
+    "q3": "📱 Créer du contenu sur les réseaux sociaux",
+    "q4": "🧪 En pratiquant et en expérimentant",
+    "q5": "4",
+    "q6": "🎓 Poursuivre des études universitaires",
+    "q7": "🧠 Analyste",
+    "q8": "🧍 Seul(e)",
+    "q9": "🏥 La santé",
 }
 
 

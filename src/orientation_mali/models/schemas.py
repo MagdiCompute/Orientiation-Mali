@@ -22,7 +22,7 @@ class Question(BaseModel):
 
     id: str
     text: str = Field(..., description="Texte de la question en français")
-    question_type: Literal["open", "multiple_choice", "scale"]
+    question_type: Literal["open", "multiple_choice", "checkbox", "scale"]
     options: list[str] | None = Field(
         None, description="Options pour les questions à choix multiples"
     )

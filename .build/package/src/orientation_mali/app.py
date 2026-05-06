@@ -9,7 +9,7 @@ import uuid
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -73,19 +73,23 @@ async def questionnaire_page(request: Request):
 
 @app.post("/api/submit")
 async def submit_questionnaire(request: Request):
-    """Traite la soumission du questionnaire.
+    """Valide les réponses et affiche la page de chargement.
 
-    Valide les réponses, appelle le pipeline d'orientation,
-    et redirige vers la page de résultats ou affiche les erreurs.
+    Si la validation échoue, réaffiche le questionnaire avec les erreurs.
+    Sinon, affiche une page de chargement qui appelle /api/process en arrière-plan.
     """
     form_data = await request.form()
 
     # Extraire le type d'examen et les réponses du formulaire
     exam_type = form_data.get("exam_type", "")
     responses: dict[str, str] = {}
-    for key, value in form_data.items():
+    for key in form_data.keys():
         if key.startswith("q"):
-            responses[key] = str(value)
+            values = form_data.getlist(key)
+            if len(values) > 1:
+                responses[key] = ", ".join(str(v) for v in values)
+            else:
+                responses[key] = str(values[0]) if values else ""
 
     # Construire les données pour la validation
     submission_data = {
@@ -108,30 +112,60 @@ async def submit_questionnaire(request: Request):
             status_code=422,
         )
 
-    # Appeler le pipeline d'orientation
+    # Afficher la page de chargement avec les données validées
+    payload = {
+        "exam_type": submission.exam_type.value,
+        "responses": submission.responses,
+    }
+    return templates.TemplateResponse(
+        request,
+        "loading.html",
+        context={"payload": payload},
+    )
+
+
+@app.post("/api/process")
+async def process_submission(request: Request):
+    """Traite la soumission en arrière-plan et retourne un JSON avec la redirection."""
+    data = await request.json()
+
+    exam_type = data.get("exam_type", "")
+    responses = data.get("responses", {})
+
     try:
         result = process_orientation(
-            exam_type=submission.exam_type.value,
-            responses=submission.responses,
+            exam_type=exam_type,
+            responses=responses,
         )
     except OrientationError as exc:
         error_response = exc.to_error_response()
-        return templates.TemplateResponse(
-            request,
-            "error.html",
-            context={
+        return JSONResponse(
+            content={
+                "error": True,
                 "message": error_response.message,
-                "retry_available": error_response.retry_available,
-            },
+                "redirect": None,
+            }
         )
 
-    # Stocker le résultat et rediriger vers la page de résultats
+    # Stocker le résultat et retourner l'URL de redirection
     result_id = str(uuid.uuid4())
     results_store.save(result_id, result)
 
-    return RedirectResponse(
-        url=f"/results?id={result_id}",
-        status_code=303,
+    return JSONResponse(
+        content={"error": False, "redirect": f"/results?id={result_id}"}
+    )
+
+
+@app.get("/error", response_class=HTMLResponse)
+async def error_page(request: Request, message: str = ""):
+    """Affiche une page d'erreur avec un message."""
+    return templates.TemplateResponse(
+        request,
+        "error.html",
+        context={
+            "message": message or _GENERIC_ERROR_MESSAGE,
+            "retry_available": True,
+        },
     )
 
 

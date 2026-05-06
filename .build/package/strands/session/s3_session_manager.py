@@ -2,28 +2,35 @@
 
 import json
 import logging
-from typing import Any, Dict, List, Optional, cast
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import TYPE_CHECKING, Any, cast
 
 import boto3
 from botocore.config import Config as BotocoreConfig
 from botocore.exceptions import ClientError
 
+from .. import _identifier
 from ..types.exceptions import SessionException
 from ..types.session import Session, SessionAgent, SessionMessage
 from .repository_session_manager import RepositorySessionManager
 from .session_repository import SessionRepository
+
+if TYPE_CHECKING:
+    from ..multiagent.base import MultiAgentBase
 
 logger = logging.getLogger(__name__)
 
 SESSION_PREFIX = "session_"
 AGENT_PREFIX = "agent_"
 MESSAGE_PREFIX = "message_"
+MULTI_AGENT_PREFIX = "multi_agent_"
 
 
 class S3SessionManager(RepositorySessionManager, SessionRepository):
     """S3-based session manager for cloud storage.
 
     Creates the following filesystem structure for the session storage:
+    ```bash
     /<sessions_dir>/
     └── session_<session_id>/
         ├── session.json                # Session metadata
@@ -33,7 +40,7 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
                 └── messages/
                     ├── message_<id1>.json
                     └── message_<id2>.json
-
+    ```
     """
 
     def __init__(
@@ -41,15 +48,16 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
         session_id: str,
         bucket: str,
         prefix: str = "",
-        boto_session: Optional[boto3.Session] = None,
-        boto_client_config: Optional[BotocoreConfig] = None,
-        region_name: Optional[str] = None,
+        boto_session: boto3.Session | None = None,
+        boto_client_config: BotocoreConfig | None = None,
+        region_name: str | None = None,
         **kwargs: Any,
     ):
         """Initialize S3SessionManager with S3 storage.
 
         Args:
             session_id: ID for the session
+                ID is not allowed to contain path separators (e.g., a/b).
             bucket: S3 bucket name (required)
             prefix: S3 key prefix for storage organization
             boto_session: Optional boto3 session
@@ -78,12 +86,32 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
         super().__init__(session_id=session_id, session_repository=self)
 
     def _get_session_path(self, session_id: str) -> str:
-        """Get session S3 prefix."""
-        return f"{self.prefix}/{SESSION_PREFIX}{session_id}/"
+        """Get session S3 prefix.
+
+        Args:
+            session_id: ID for the session.
+
+        Raises:
+            ValueError: If session id contains a path separator.
+        """
+        session_id = _identifier.validate(session_id, _identifier.Identifier.SESSION)
+        prefix = self.prefix.strip("/")
+        if prefix:
+            return f"{prefix}/{SESSION_PREFIX}{session_id}/"
+        return f"{SESSION_PREFIX}{session_id}/"
 
     def _get_agent_path(self, session_id: str, agent_id: str) -> str:
-        """Get agent S3 prefix."""
+        """Get agent S3 prefix.
+
+        Args:
+            session_id: ID for the session.
+            agent_id: ID for the agent.
+
+        Raises:
+            ValueError: If session id or agent id contains a path separator.
+        """
         session_path = self._get_session_path(session_id)
+        agent_id = _identifier.validate(agent_id, _identifier.Identifier.AGENT)
         return f"{session_path}agents/{AGENT_PREFIX}{agent_id}/"
 
     def _get_message_path(self, session_id: str, agent_id: str, message_id: int) -> str:
@@ -93,15 +121,20 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
             session_id: ID of the session
             agent_id: ID of the agent
             message_id: Index of the message
-            **kwargs: Additional keyword arguments for future extensibility.
 
         Returns:
             The key for the message
+
+        Raises:
+            ValueError: If message_id is not an integer.
         """
+        if not isinstance(message_id, int):
+            raise ValueError(f"message_id=<{message_id}> | message id must be an integer")
+
         agent_path = self._get_agent_path(session_id, agent_id)
         return f"{agent_path}messages/{MESSAGE_PREFIX}{message_id}.json"
 
-    def _read_s3_object(self, key: str) -> Optional[Dict[str, Any]]:
+    def _read_s3_object(self, key: str) -> dict[str, Any] | None:
         """Read JSON object from S3."""
         try:
             response = self.client.get_object(Bucket=self.bucket, Key=key)
@@ -115,7 +148,7 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
         except json.JSONDecodeError as e:
             raise SessionException(f"Invalid JSON in S3 object {key}: {e}") from e
 
-    def _write_s3_object(self, key: str, data: Dict[str, Any]) -> None:
+    def _write_s3_object(self, key: str, data: dict[str, Any]) -> None:
         """Write JSON object to S3."""
         try:
             content = json.dumps(data, indent=2, ensure_ascii=False)
@@ -142,7 +175,7 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
         self._write_s3_object(session_key, session_dict)
         return session
 
-    def read_session(self, session_id: str, **kwargs: Any) -> Optional[Session]:
+    def read_session(self, session_id: str, **kwargs: Any) -> Session | None:
         """Read session data from S3."""
         session_key = f"{self._get_session_path(session_id)}session.json"
         session_data = self._read_s3_object(session_key)
@@ -180,7 +213,7 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
         agent_key = f"{self._get_agent_path(session_id, agent_id)}agent.json"
         self._write_s3_object(agent_key, agent_dict)
 
-    def read_agent(self, session_id: str, agent_id: str, **kwargs: Any) -> Optional[SessionAgent]:
+    def read_agent(self, session_id: str, agent_id: str, **kwargs: Any) -> SessionAgent | None:
         """Read agent data from S3."""
         agent_key = f"{self._get_agent_path(session_id, agent_id)}agent.json"
         agent_data = self._read_s3_object(agent_key)
@@ -207,7 +240,7 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
         message_key = self._get_message_path(session_id, agent_id, message_id)
         self._write_s3_object(message_key, message_dict)
 
-    def read_message(self, session_id: str, agent_id: str, message_id: int, **kwargs: Any) -> Optional[SessionMessage]:
+    def read_message(self, session_id: str, agent_id: str, message_id: int, **kwargs: Any) -> SessionMessage | None:
         """Read message data from S3."""
         message_key = self._get_message_path(session_id, agent_id, message_id)
         message_data = self._read_s3_object(message_key)
@@ -228,9 +261,23 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
         self._write_s3_object(message_key, session_message.to_dict())
 
     def list_messages(
-        self, session_id: str, agent_id: str, limit: Optional[int] = None, offset: int = 0, **kwargs: Any
-    ) -> List[SessionMessage]:
-        """List messages for an agent with pagination from S3."""
+        self, session_id: str, agent_id: str, limit: int | None = None, offset: int = 0, **kwargs: Any
+    ) -> list[SessionMessage]:
+        """List messages for an agent with pagination from S3.
+
+        Args:
+            session_id: ID of the session
+            agent_id: ID of the agent
+            limit: Optional limit on number of messages to return
+            offset: Optional offset for pagination
+            **kwargs: Additional keyword arguments
+
+        Returns:
+            List of SessionMessage objects, sorted by message_id.
+
+        Raises:
+            SessionException: If S3 error occurs during message retrieval.
+        """
         messages_prefix = f"{self._get_agent_path(session_id, agent_id)}messages/"
         try:
             paginator = self.client.get_paginator("list_objects_v2")
@@ -258,10 +305,38 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
             else:
                 message_keys = message_keys[offset:]
 
-            # Load only the required message objects
-            messages: List[SessionMessage] = []
-            for key in message_keys:
-                message_data = self._read_s3_object(key)
+            # Load message objects in parallel for better performance
+            messages: list[SessionMessage] = []
+            if not message_keys:
+                return messages
+
+            # Optimize for single worker case - avoid thread pool overhead
+            if len(message_keys) == 1:
+                for key in message_keys:
+                    message_data = self._read_s3_object(key)
+                    if message_data:
+                        messages.append(SessionMessage.from_dict(message_data))
+                return messages
+
+            with ThreadPoolExecutor() as executor:
+                # Submit all read tasks
+                future_to_key = {executor.submit(self._read_s3_object, key): key for key in message_keys}
+
+                # Create a mapping from key to index to maintain order
+                key_to_index = {key: idx for idx, key in enumerate(message_keys)}
+
+                # Initialize results list with None placeholders to maintain order
+                results: list[dict[str, Any] | None] = [None] * len(message_keys)
+
+                # Process results as they complete
+                for future in as_completed(future_to_key):
+                    key = future_to_key[future]
+                    message_data = future.result()
+                    # Store result at the correct index to maintain order
+                    results[key_to_index[key]] = message_data
+
+            # Convert results to SessionMessage objects, filtering out None values
+            for message_data in results:
                 if message_data:
                     messages.append(SessionMessage.from_dict(message_data))
 
@@ -269,3 +344,31 @@ class S3SessionManager(RepositorySessionManager, SessionRepository):
 
         except ClientError as e:
             raise SessionException(f"S3 error reading messages: {e}") from e
+
+    def _get_multi_agent_path(self, session_id: str, multi_agent_id: str) -> str:
+        """Get multi-agent S3 prefix."""
+        session_path = self._get_session_path(session_id)
+        multi_agent_id = _identifier.validate(multi_agent_id, _identifier.Identifier.AGENT)
+        return f"{session_path}multi_agents/{MULTI_AGENT_PREFIX}{multi_agent_id}/"
+
+    def create_multi_agent(self, session_id: str, multi_agent: "MultiAgentBase", **kwargs: Any) -> None:
+        """Create a new multiagent state in S3."""
+        multi_agent_id = multi_agent.id
+        multi_agent_key = f"{self._get_multi_agent_path(session_id, multi_agent_id)}multi_agent.json"
+        session_data = multi_agent.serialize_state()
+        self._write_s3_object(multi_agent_key, session_data)
+
+    def read_multi_agent(self, session_id: str, multi_agent_id: str, **kwargs: Any) -> dict[str, Any] | None:
+        """Read multi-agent state from S3."""
+        multi_agent_key = f"{self._get_multi_agent_path(session_id, multi_agent_id)}multi_agent.json"
+        return self._read_s3_object(multi_agent_key)
+
+    def update_multi_agent(self, session_id: str, multi_agent: "MultiAgentBase", **kwargs: Any) -> None:
+        """Update multi-agent state in S3."""
+        multi_agent_state = multi_agent.serialize_state()
+        previous_multi_agent_state = self.read_multi_agent(session_id=session_id, multi_agent_id=multi_agent.id)
+        if previous_multi_agent_state is None:
+            raise SessionException(f"MultiAgent state {multi_agent.id} in session {session_id} does not exist")
+
+        multi_agent_key = f"{self._get_multi_agent_path(session_id, multi_agent.id)}multi_agent.json"
+        self._write_s3_object(multi_agent_key, multi_agent_state)

@@ -9,5 +9,7 @@
   "then": {
     "type": "runCommand",
     "command": "git add -A && git commit -m \"Update project files\""
-  }
+  },
+  "workspaceFolderName": "Orientation",
+  "shortName": "git-commit-changes"
 }

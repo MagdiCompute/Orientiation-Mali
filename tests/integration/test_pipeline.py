@@ -39,16 +39,15 @@ def valid_form_data():
     """Données de formulaire valides avec les 10 réponses."""
     return {
         "exam_type": "BAC",
-        "q1": "Mathématiques et physique",
-        "q2": "Sciences et mathématiques",
-        "q3": "Lire des livres scientifiques",
-        "q4": "Ingénieur",
-        "q5": "En résolvant des problèmes seul(e)",
-        "q6": "5",
-        "q7": "Poursuivre des études universitaires",
-        "q8": "J'ai gagné un concours de mathématiques",
-        "q9": "Je préfère travailler seul pour me concentrer",
-        "q10": "Améliorer l'accès à l'éducation",
+        "q1": "📐 Maths et Sciences",
+        "q2": "🔬 Sciences et mathématiques",
+        "q3": "📱 Créer du contenu sur les réseaux sociaux",
+        "q4": "🧪 En pratiquant et en expérimentant",
+        "q5": "5",
+        "q6": "🎓 Poursuivre des études universitaires",
+        "q7": "🧠 Analyste",
+        "q8": "🧍 Seul(e)",
+        "q9": "📚 L'éducation",
     }
 
 
@@ -174,16 +173,15 @@ class TestIncompleteSubmission:
         Requirements: 2.2
         """
         data = {
-            "q1": "Mathématiques",
-            "q2": "Sciences",
-            "q3": "Lecture",
-            "q4": "Ingénieur",
-            "q5": "En pratiquant",
-            "q6": "4",
-            "q7": "Études universitaires",
-            "q8": "Concours gagné",
-            "q9": "En équipe",
-            "q10": "Éducation",
+            "q1": "📐 Maths et Sciences",
+            "q2": "🔬 Sciences et mathématiques",
+            "q3": "🔧 Réparer ou construire des choses",
+            "q4": "🧪 En pratiquant et en expérimentant",
+            "q5": "4",
+            "q6": "🎓 Poursuivre des études universitaires",
+            "q7": "🧠 Analyste",
+            "q8": "👫 En équipe",
+            "q9": "📚 L'éducation",
         }
 
         response = client.post("/api/submit", data=data)
@@ -201,15 +199,14 @@ class TestIncompleteSubmission:
         data = {
             "exam_type": "DEF",
             "q1": "",
-            "q2": "Sciences",
-            "q3": "Lecture",
-            "q4": "Médecin",
-            "q5": "En groupe",
-            "q6": "3",
-            "q7": "Formation professionnelle",
-            "q8": "Projet réussi",
-            "q9": "En équipe",
-            "q10": "Santé",
+            "q2": "🔬 Sciences et mathématiques",
+            "q3": "🤝 Aider les gens autour de moi",
+            "q4": "👥 En travaillant en groupe",
+            "q5": "3",
+            "q6": "🛠️ Suivre une formation professionnelle courte",
+            "q7": "❤️ Aidant",
+            "q8": "👫 En équipe",
+            "q9": "🏥 La santé",
         }
 
         response = client.post("/api/submit", data=data)
@@ -226,16 +223,15 @@ class TestIncompleteSubmission:
         """
         data = {
             "exam_type": "INVALID",
-            "q1": "Mathématiques",
-            "q2": "Sciences",
-            "q3": "Lecture",
-            "q4": "Ingénieur",
-            "q5": "En pratiquant",
-            "q6": "4",
-            "q7": "Études universitaires",
-            "q8": "Concours gagné",
-            "q9": "En équipe",
-            "q10": "Éducation",
+            "q1": "📐 Maths et Sciences",
+            "q2": "🔬 Sciences et mathématiques",
+            "q3": "🔧 Réparer ou construire des choses",
+            "q4": "🧪 En pratiquant et en expérimentant",
+            "q5": "4",
+            "q6": "🎓 Poursuivre des études universitaires",
+            "q7": "🧠 Analyste",
+            "q8": "👫 En équipe",
+            "q9": "📚 L'éducation",
         }
 
         response = client.post("/api/submit", data=data)

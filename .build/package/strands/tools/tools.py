@@ -12,9 +12,16 @@ from typing import Any
 
 from typing_extensions import override
 
+from ..types._events import ToolResultEvent
 from ..types.tools import AgentTool, ToolFunc, ToolGenerator, ToolSpec, ToolUse
 
 logger = logging.getLogger(__name__)
+
+_COMPOSITION_KEYWORDS = ("anyOf", "oneOf", "allOf", "not")
+"""JSON Schema composition keywords that define type constraints.
+
+Properties with these should not get a default type: "string" added.
+"""
 
 
 class InvalidToolUseNameException(Exception):
@@ -87,7 +94,9 @@ def _normalize_property(prop_name: str, prop_def: Any) -> dict[str, Any]:
     if "$ref" in normalized_prop:
         return normalized_prop
 
-    normalized_prop.setdefault("type", "string")
+    has_composition = any(kw in normalized_prop for kw in _COMPOSITION_KEYWORDS)
+    if not has_composition:
+        normalized_prop.setdefault("type", "string")
     normalized_prop.setdefault("description", f"Property {prop_name}")
     return normalized_prop
 
@@ -188,6 +197,40 @@ class PythonAgentTool(AgentTool):
         """
         return self._tool_spec
 
+    @tool_spec.setter
+    def tool_spec(self, value: ToolSpec) -> None:
+        """Set the tool specification.
+
+        This allows runtime modification of the tool's schema, enabling dynamic
+        tool configurations based on feature flags or other runtime conditions.
+
+        Args:
+            value: The new tool specification.
+
+        Raises:
+            ValueError: If the spec fails structural validation (wrong name or
+                missing required field).
+        """
+        if value.get("name") != self._tool_name:
+            raise ValueError(
+                f"cannot change tool name via tool_spec (expected '{self._tool_name}', got '{value.get('name')}')"
+            )
+
+        for field in ("description", "inputSchema"):
+            if field not in value:
+                raise ValueError(f"tool_spec must contain '{field}'")
+
+        self._tool_spec = value
+
+    @property
+    def supports_hot_reload(self) -> bool:
+        """Check if this tool supports automatic reloading when modified.
+
+        Returns:
+            Always true for function-based tools.
+        """
+        return True
+
     @property
     def tool_type(self) -> str:
         """Identifies this as a Python-based tool implementation.
@@ -211,7 +254,7 @@ class PythonAgentTool(AgentTool):
         """
         if inspect.iscoroutinefunction(self._tool_func):
             result = await self._tool_func(tool_use, **invocation_state)
+            yield ToolResultEvent(result)
         else:
             result = await asyncio.to_thread(self._tool_func, tool_use, **invocation_state)
-
-        yield result
+            yield ToolResultEvent(result)

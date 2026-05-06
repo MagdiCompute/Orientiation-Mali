@@ -7,22 +7,24 @@ functions, supporting both individual callback registration and bulk registratio
 via hook provider objects.
 """
 
+import inspect
+import logging
+from collections.abc import Awaitable, Generator
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generator, Generic, Protocol, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar, runtime_checkable
+
+from ..interrupt import Interrupt, InterruptException
+from ._type_inference import infer_event_types
 
 if TYPE_CHECKING:
     from ..agent import Agent
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
-class HookEvent:
-    """Base class for all hook events.
-
-    Attributes:
-        agent: The agent instance that triggered this event.
-    """
-
-    agent: "Agent"
+class BaseHookEvent:
+    """Base class for all hook events."""
 
     @property
     def should_reverse_callbacks(self) -> bool:
@@ -66,13 +68,25 @@ class HookEvent:
         raise AttributeError(f"Property {name} is not writable")
 
 
-TEvent = TypeVar("TEvent", bound=HookEvent, contravariant=True)
+@dataclass
+class HookEvent(BaseHookEvent):
+    """Base class for single agent hook events.
+
+    Attributes:
+        agent: The agent instance that triggered this event.
+    """
+
+    agent: "Agent"
+
+
+TEvent = TypeVar("TEvent", bound=BaseHookEvent, contravariant=True)
 """Generic for adding callback handlers - contravariant to allow adding handlers which take in base classes."""
 
-TInvokeEvent = TypeVar("TInvokeEvent", bound=HookEvent)
+TInvokeEvent = TypeVar("TInvokeEvent", bound=BaseHookEvent)
 """Generic for invoking events - non-contravariant to enable returning events."""
 
 
+@runtime_checkable
 class HookProvider(Protocol):
     """Protocol for objects that provide hook callbacks to an agent.
 
@@ -112,10 +126,15 @@ class HookCallback(Protocol, Generic[TEvent]):
         ```python
         def my_callback(event: StartRequestEvent) -> None:
             print(f"Request started for agent: {event.agent.name}")
+
+        # Or
+
+        async def my_callback(event: StartRequestEvent) -> None:
+            # await an async operation
         ```
     """
 
-    def __call__(self, event: TEvent) -> None:
+    def __call__(self, event: TEvent) -> None | Awaitable[None]:
         """Handle a hook event.
 
         Args:
@@ -137,25 +156,98 @@ class HookRegistry:
 
     def __init__(self) -> None:
         """Initialize an empty hook registry."""
-        self._registered_callbacks: dict[Type, list[HookCallback]] = {}
+        self._registered_callbacks: dict[type, list[HookCallback]] = {}
 
-    def add_callback(self, event_type: Type[TEvent], callback: HookCallback[TEvent]) -> None:
+    def add_callback(
+        self,
+        event_type: type[TEvent] | list[type[TEvent]] | None,
+        callback: HookCallback[TEvent],
+    ) -> None:
         """Register a callback function for a specific event type.
 
+        If ``event_type`` is None, then this will check the callback handler type hint
+        for the lifecycle event type. Union types (``A | B`` or ``Union[A, B]``) in
+        type hints will register the callback for each event type in the union.
+
+        If ``event_type`` is a list, the callback will be registered for each event
+        type in the list (duplicates are ignored).
+
         Args:
-            event_type: The class type of events this callback should handle.
+            event_type: The lifecycle event type(s) this callback should handle.
+                Can be a single type, a list of types, or None to infer from type hints.
             callback: The callback function to invoke when events of this type occur.
+
+        Raises:
+            ValueError: If event_type is not provided and cannot be inferred from
+                the callback's type hints, or if AgentInitializedEvent is registered
+                with an async callback, or if the event_type list is empty.
 
         Example:
             ```python
             def my_handler(event: StartRequestEvent):
                 print("Request started")
 
+            # With explicit event type
             registry.add_callback(StartRequestEvent, my_handler)
+
+            # With event type inferred from type hint
+            registry.add_callback(None, my_handler)
+
+            # With union type hint (registers for both types)
+            def union_handler(event: BeforeModelCallEvent | AfterModelCallEvent):
+                print(f"Event: {type(event).__name__}")
+            registry.add_callback(None, union_handler)
+
+            # With list of event types
+            def multi_handler(event):
+                print(f"Event: {type(event).__name__}")
+            registry.add_callback([BeforeModelCallEvent, AfterModelCallEvent], multi_handler)
             ```
         """
-        callbacks = self._registered_callbacks.setdefault(event_type, [])
-        callbacks.append(callback)
+        resolved_event_types: list[type[TEvent]]
+
+        # Handle list of event types
+        if isinstance(event_type, list):
+            if not event_type:
+                raise ValueError("event_type list cannot be empty")
+            resolved_event_types = self._validate_event_type_list(event_type)
+        elif event_type is None:
+            # Infer event type(s) from callback type hints
+            resolved_event_types = infer_event_types(callback)
+        else:
+            # Single event type provided explicitly
+            resolved_event_types = [event_type]
+
+        # Deduplicate event types while preserving order
+        unique_event_types: set[type[TEvent]] = set(resolved_event_types)
+
+        # Register callback for each event type
+        for resolved_event_type in unique_event_types:
+            # Related issue: https://github.com/strands-agents/sdk-python/issues/330
+            if resolved_event_type.__name__ == "AgentInitializedEvent" and inspect.iscoroutinefunction(callback):
+                raise ValueError("AgentInitializedEvent can only be registered with a synchronous callback")
+
+            callbacks = self._registered_callbacks.setdefault(resolved_event_type, [])
+            callbacks.append(callback)
+
+    def _validate_event_type_list(self, event_types: list[type[TEvent]]) -> list[type[TEvent]]:
+        """Validate that all types in a list are valid BaseHookEvent subclasses.
+
+        Args:
+            event_types: List of event types to validate.
+
+        Returns:
+            The validated list of event types.
+
+        Raises:
+            ValueError: If any type is not a valid BaseHookEvent subclass.
+        """
+        validated: list[type[TEvent]] = []
+        for et in event_types:
+            if not (isinstance(et, type) and issubclass(et, BaseHookEvent)):
+                raise ValueError(f"Invalid event type: {et} | must be a subclass of BaseHookEvent")
+            validated.append(et)
+        return validated
 
     def add_hook(self, hook: HookProvider) -> None:
         """Register all callbacks from a hook provider.
@@ -179,7 +271,7 @@ class HookRegistry:
         """
         hook.register_hooks(self)
 
-    def invoke_callbacks(self, event: TInvokeEvent) -> TInvokeEvent:
+    async def invoke_callbacks_async(self, event: TInvokeEvent) -> tuple[TInvokeEvent, list[Interrupt]]:
         """Invoke all registered callbacks for the given event.
 
         This method finds all callbacks registered for the event's type and
@@ -187,11 +279,63 @@ class HookRegistry:
         callbacks are invoked in reverse registration order. Any exceptions raised by callback
         functions will propagate to the caller.
 
+        Additionally, this method aggregates interrupts raised by the user to instantiate human-in-the-loop workflows.
+
         Args:
             event: The event to dispatch to registered callbacks.
 
         Returns:
-            The event dispatched to registered callbacks.
+            The event dispatched to registered callbacks and any interrupts raised by the user.
+
+        Raises:
+            ValueError: If interrupt name is used more than once.
+
+        Example:
+            ```python
+            event = StartRequestEvent(agent=my_agent)
+            await registry.invoke_callbacks_async(event)
+            ```
+        """
+        interrupts: dict[str, Interrupt] = {}
+
+        for callback in self.get_callbacks_for(event):
+            try:
+                if inspect.iscoroutinefunction(callback):
+                    await callback(event)
+                else:
+                    callback(event)
+
+            except InterruptException as exception:
+                interrupt = exception.interrupt
+                if interrupt.name in interrupts:
+                    message = f"interrupt_name=<{interrupt.name}> | interrupt name used more than once"
+                    logger.error(message)
+                    raise ValueError(message) from exception
+
+                # Each callback is allowed to raise their own interrupt.
+                interrupts[interrupt.name] = interrupt
+
+        return event, list(interrupts.values())
+
+    def invoke_callbacks(self, event: TInvokeEvent) -> tuple[TInvokeEvent, list[Interrupt]]:
+        """Invoke all registered callbacks for the given event.
+
+        This method finds all callbacks registered for the event's type and
+        invokes them in the appropriate order. For events with should_reverse_callbacks=True,
+        callbacks are invoked in reverse registration order. Any exceptions raised by callback
+        functions will propagate to the caller.
+
+        Additionally, this method aggregates interrupts raised by the user to instantiate human-in-the-loop workflows.
+
+        Args:
+            event: The event to dispatch to registered callbacks.
+
+        Returns:
+            The event dispatched to registered callbacks and any interrupts raised by the user.
+
+        Raises:
+            RuntimeError: If at least one callback is async.
+            ValueError: If interrupt name is used more than once.
 
         Example:
             ```python
@@ -199,10 +343,26 @@ class HookRegistry:
             registry.invoke_callbacks(event)
             ```
         """
-        for callback in self.get_callbacks_for(event):
-            callback(event)
+        callbacks = list(self.get_callbacks_for(event))
+        interrupts: dict[str, Interrupt] = {}
 
-        return event
+        if any(inspect.iscoroutinefunction(callback) for callback in callbacks):
+            raise RuntimeError(f"event=<{event}> | use invoke_callbacks_async to invoke async callback")
+
+        for callback in callbacks:
+            try:
+                callback(event)
+            except InterruptException as exception:
+                interrupt = exception.interrupt
+                if interrupt.name in interrupts:
+                    message = f"interrupt_name=<{interrupt.name}> | interrupt name used more than once"
+                    logger.error(message)
+                    raise ValueError(message) from exception
+
+                # Each callback is allowed to raise their own interrupt.
+                interrupts[interrupt.name] = interrupt
+
+        return event, list(interrupts.values())
 
     def has_callbacks(self) -> bool:
         """Check if the registry has any registered callbacks.

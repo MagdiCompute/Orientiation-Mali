@@ -10,8 +10,36 @@ Parameters:
   S3Key:
     Type: String
     Description: S3 key for the Lambda deployment package zip
+  DomainName:
+    Type: String
+    Default: orientation-mali.com
+    Description: Custom domain name for the application
+  HostedZoneId:
+    Type: String
+    Description: Route 53 Hosted Zone ID for the domain
+  EnableCustomDomain:
+    Type: String
+    Default: "true"
+    AllowedValues:
+      - "true"
+      - "false"
+    Description: Whether to deploy custom domain resources (Certificate, Domain, API Mapping, DNS)
+
+Conditions:
+  DeployCustomDomain: !Equals [!Ref EnableCustomDomain, "true"]
 
 Resources:
+  # ACM Certificate for custom domain
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Condition: DeployCustomDomain
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+
   # DynamoDB table for storing orientation results
   ResultsTable:
     Type: AWS::DynamoDB::Table
@@ -126,10 +154,47 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*"
 
+  # Custom domain name for API Gateway
+  ApiDomainName:
+    Type: AWS::ApiGatewayV2::DomainName
+    Condition: DeployCustomDomain
+    DependsOn: Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      DomainNameConfigurations:
+        - EndpointType: REGIONAL
+          CertificateArn: !Ref Certificate
+
+  # API mapping to connect custom domain to the API
+  ApiMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Condition: DeployCustomDomain
+    DependsOn: HttpApiStage
+    Properties:
+      ApiId: !Ref HttpApi
+      DomainName: !Ref ApiDomainName
+      Stage: $default
+
+  # Route 53 alias record pointing to API Gateway custom domain
+  DnsRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: DeployCustomDomain
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt ApiDomainName.RegionalDomainName
+        HostedZoneId: !GetAtt ApiDomainName.RegionalHostedZoneId
+
 Outputs:
   OrientationMaliApi:
     Description: API Gateway endpoint URL
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
+  CustomDomainUrl:
+    Description: Custom domain URL
+    Condition: DeployCustomDomain
+    Value: !Sub "https://${DomainName}/"
   OrientationMaliFunction:
     Description: Lambda Function ARN
     Value: !GetAtt OrientationMaliFunction.Arn

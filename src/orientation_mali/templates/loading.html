@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Traitement en cours - Orientation Mali{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .loading-container {
+        text-align: center;
+        padding: 3rem 1rem;
+    }
+
+    .loading-spinner {
+        width: 60px;
+        height: 60px;
+        border: 5px solid #e5e7eb;
+        border-top: 5px solid #14532d;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1.5rem;
+    }
+
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+
+    .loading-title {
+        font-size: 1.4rem;
+        color: #14532d;
+        margin-bottom: 0.75rem;
+    }
+
+    .loading-message {
+        color: #6b7280;
+        font-size: 1rem;
+        margin-bottom: 2rem;
+    }
+
+    .loading-steps {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1rem;
+        max-width: 400px;
+        margin: 0 auto;
+    }
+
+    .loading-step {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1.25rem;
+        background: #f0fdf4;
+        border-radius: 8px;
+        width: 100%;
+        opacity: 0.4;
+        transition: opacity 0.5s;
+    }
+
+    .loading-step.active {
+        opacity: 1;
+    }
+
+    .loading-step.done {
+        opacity: 0.7;
+    }
+
+    .step-icon {
+        font-size: 1.3rem;
+    }
+
+    .step-text {
+        font-size: 0.95rem;
+        color: #1f2937;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="loading-container">
+        <div class="loading-spinner" role="status" aria-label="Chargement en cours"></div>
+        <h2 class="loading-title">Analyse de vos réponses en cours...</h2>
+        <p class="loading-message">
+            Notre intelligence artificielle étudie votre profil pour vous proposer
+            des recommandations personnalisées.
+        </p>
+
+        <div class="loading-steps">
+            <div class="loading-step active" id="step-1">
+                <span class="step-icon">📋</span>
+                <span class="step-text">Validation de vos réponses</span>
+            </div>
+            <div class="loading-step" id="step-2">
+                <span class="step-icon">🧠</span>
+                <span class="step-text">Construction de votre profil</span>
+            </div>
+            <div class="loading-step" id="step-3">
+                <span class="step-icon">🎯</span>
+                <span class="step-text">Génération des recommandations</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script type="application/json" id="form-payload">{{ payload | tojson }}</script>
+
+<script>
+    const steps = document.querySelectorAll('.loading-step');
+    let currentStep = 0;
+
+    function advanceStep() {
+        if (currentStep < steps.length) {
+            if (currentStep > 0) {
+                steps[currentStep - 1].classList.remove('active');
+                steps[currentStep - 1].classList.add('done');
+            }
+            steps[currentStep].classList.add('active');
+            currentStep++;
+        }
+    }
+
+    // Advance steps on a timer to give visual feedback
+    setTimeout(() => advanceStep(), 2000);
+    setTimeout(() => advanceStep(), 8000);
+
+    // Submit the form data in the background
+    const formData = JSON.parse(document.getElementById('form-payload').textContent);
+
+    fetch('/api/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.redirect) {
+            window.location.href = data.redirect;
+        } else if (data.error) {
+            window.location.href = '/error?message=' + encodeURIComponent(data.message);
+        }
+    })
+    .catch(() => {
+        window.location.href = '/error?message=' + encodeURIComponent('Une erreur est survenue. Veuillez réessayer.');
+    });
+</script>
+{% endblock %}

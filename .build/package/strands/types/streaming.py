@@ -5,10 +5,9 @@ These types are modeled after the Bedrock API.
 - Bedrock docs: https://docs.aws.amazon.com/bedrock/latest/APIReference/API_Types_Amazon_Bedrock_Runtime.html
 """
 
-from typing import Optional, Union
-
 from typing_extensions import TypedDict
 
+from .citations import CitationLocation
 from .content import ContentBlockStart, Role
 from .event_loop import Metrics, StopReason, Usage
 from .guardrails import Trace
@@ -33,7 +32,7 @@ class ContentBlockStartEvent(TypedDict, total=False):
         start: Information about the content block being started.
     """
 
-    contentBlockIndex: Optional[int]
+    contentBlockIndex: int | None
     start: ContentBlockStart
 
 
@@ -57,6 +56,41 @@ class ContentBlockDeltaToolUse(TypedDict):
     input: str
 
 
+class CitationSourceContentDelta(TypedDict, total=False):
+    """Contains incremental updates to source content text during streaming.
+
+    Allows clients to build up the cited content progressively during
+    streaming responses.
+
+    Attributes:
+        text: An incremental update to the text content from the source
+            document that is being cited.
+    """
+
+    text: str
+
+
+class CitationsDelta(TypedDict, total=False):
+    """Contains incremental updates to citation information during streaming.
+
+    This allows clients to build up citation data progressively as the
+    response is generated.
+
+    Attributes:
+        location: Specifies the precise location within a source document
+            where cited content can be found. This can include character-level
+            positions, page numbers, or document chunks depending on the
+            document type and indexing method.
+        sourceContent: The specific content from the source document that was
+            referenced or cited in the generated response.
+        title: The title or identifier of the source document being cited.
+    """
+
+    location: CitationLocation
+    sourceContent: list[CitationSourceContentDelta]
+    title: str
+
+
 class ReasoningContentBlockDelta(TypedDict, total=False):
     """Delta for reasoning content block in a streaming response.
 
@@ -66,9 +100,9 @@ class ReasoningContentBlockDelta(TypedDict, total=False):
         text: The reasoning that the model used to return the output.
     """
 
-    redactedContent: Optional[bytes]
-    signature: Optional[str]
-    text: Optional[str]
+    redactedContent: bytes | None
+    signature: str | None
+    text: str | None
 
 
 class ContentBlockDelta(TypedDict, total=False):
@@ -83,6 +117,7 @@ class ContentBlockDelta(TypedDict, total=False):
     reasoningContent: ReasoningContentBlockDelta
     text: str
     toolUse: ContentBlockDeltaToolUse
+    citation: CitationsDelta
 
 
 class ContentBlockDeltaEvent(TypedDict, total=False):
@@ -94,7 +129,7 @@ class ContentBlockDeltaEvent(TypedDict, total=False):
         delta: The incremental content update for the content block.
     """
 
-    contentBlockIndex: Optional[int]
+    contentBlockIndex: int | None
     delta: ContentBlockDelta
 
 
@@ -106,7 +141,7 @@ class ContentBlockStopEvent(TypedDict, total=False):
             This is optional to accommodate different model providers.
     """
 
-    contentBlockIndex: Optional[int]
+    contentBlockIndex: int | None
 
 
 class MessageStopEvent(TypedDict, total=False):
@@ -117,7 +152,7 @@ class MessageStopEvent(TypedDict, total=False):
         stopReason: The reason why the model stopped generating content.
     """
 
-    additionalModelResponseFields: Optional[Union[dict, list, int, float, str, bool, None]]
+    additionalModelResponseFields: dict | list | int | float | str | bool | None | None
     stopReason: StopReason
 
 
@@ -131,7 +166,7 @@ class MetadataEvent(TypedDict, total=False):
     """
 
     metrics: Metrics
-    trace: Optional[Trace]
+    trace: Trace | None
     usage: Usage
 
 
@@ -166,8 +201,8 @@ class RedactContentEvent(TypedDict, total=False):
 
     """
 
-    redactUserContentMessage: Optional[str]
-    redactAssistantContentMessage: Optional[str]
+    redactUserContentMessage: str | None
+    redactAssistantContentMessage: str | None
 
 
 class StreamEvent(TypedDict, total=False):
